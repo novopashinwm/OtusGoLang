@@ -20,25 +20,27 @@ func Unpack(inStr string) (string, error) {
 	if unicode.IsDigit(chars[0]) {
 		return "", ErrInvalidString
 	}
-	var num = len(chars)
-	var ekranSymbol = false
+	num := len(chars)
+	ekranSymbol := false
 	for i := 0; i < num; i++ {
 		curr := string(chars[i])
-		if chars[i] == 92 && !ekranSymbol {
+		switch {
+		case chars[i] == 92 && !ekranSymbol:
 			ekranSymbol = true
-		} else if i < (num-1) && unicode.IsDigit(chars[i+1]) {
+		case i < (num-1) && unicode.IsDigit(chars[i+1]):
 			if IsNextDigital(i, num, chars) {
 				return "", ErrInvalidString
 			}
 
 			next := string(chars[i+1])
-			var repeatNum, _ = strconv.Atoi(next)
+			repeatNum, _ := strconv.Atoi(next)
 			if repeatNum != 0 {
 				sb.WriteString(strings.Repeat(curr, repeatNum))
 			}
 
 			i++
-		} else {
+		default:
+
 			sb.WriteString(curr)
 			ekranSymbol = false
 		}
