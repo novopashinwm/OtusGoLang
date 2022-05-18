@@ -21,12 +21,13 @@ func Unpack(inStr string) (string, error) {
 		return "", ErrInvalidString
 	}
 	num := len(chars)
-	ekranSymbol := false
+	isPrevEscapeCharacter := false
 	for i := 0; i < num; i++ {
 		curr := string(chars[i])
+		const escapeCharacter = 92
 		switch {
-		case chars[i] == 92 && !ekranSymbol:
-			ekranSymbol = true
+		case chars[i] == escapeCharacter && !isPrevEscapeCharacter:
+			isPrevEscapeCharacter = true
 		case i < (num-1) && unicode.IsDigit(chars[i+1]):
 			if IsNextDigital(i, num, chars) {
 				return "", ErrInvalidString
@@ -42,7 +43,7 @@ func Unpack(inStr string) (string, error) {
 		default:
 
 			sb.WriteString(curr)
-			ekranSymbol = false
+			isPrevEscapeCharacter = false
 		}
 	}
 	return sb.String(), err
