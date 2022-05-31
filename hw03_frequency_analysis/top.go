@@ -27,11 +27,10 @@ func (s words) Less(i, j int) bool {
 func (s words) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func Top10(inStr string) []string {
-	// Place your code here.
 	if inStr == "" {
 		return nil
 	}
-	re := regexp.MustCompile(`^(.*)[\.\-]$`)
+	re := regexp.MustCompile(`^(.*)[\.\-\;\+\!\?\:]$`)
 	arrSplit := strings.Fields(inStr)
 	cache := make(map[string]int)
 	for i := 0; i < len(arrSplit); i++ {
