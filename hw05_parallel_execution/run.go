@@ -20,16 +20,14 @@ func Run(tasks []Task, n, m int) error {
 		go func() {
 			defer wg.Done()
 			for task := range taskCh {
-				if err := task; err != nil && m > 1 {
+				if err := task(); err != nil && m > 1 {
 					atomic.AddInt32(&errCnt, 1)
-				} else {
-					task()
 				}
 			}
 		}()
 	}
 	for _, task := range tasks {
-		if m > 1 && atomic.LoadInt32(&errCnt) >= int32(m) {
+		if atomic.LoadInt32(&errCnt) >= int32(m) {
 			break
 		}
 		taskCh <- task
