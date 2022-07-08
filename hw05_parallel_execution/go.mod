@@ -1,4 +1,4 @@
-module github.com/novopashinwm/OtusGoLang/tree/master/hw05_parallel_execution
+module github.com/novopashinwm/OtusGoLang/hw05_parallel_execution
 
 go 1.16
 
