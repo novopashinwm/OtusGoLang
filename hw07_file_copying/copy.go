@@ -54,9 +54,9 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 		} else if err != nil {
 			return err
 		}
-		if readBuf[0] != 10 {
-			currOffset++
-		}
+		//if readBuf[0] != 10 {
+		currOffset++
+		//}
 		indexOffset++
 	}
 
@@ -69,10 +69,10 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 		} else if err != nil {
 			return err
 		}
-		if readBuf[0] != 10 {
-			arrayIndex++
-			bar.Play(int64(arrayIndex))
-		}
+		//if readBuf[0] != 10 {
+		arrayIndex++
+		bar.Play(int64(arrayIndex))
+		//}
 		_, err = fileTo.Write(readBuf)
 		if err != nil {
 			return err
