@@ -43,8 +43,8 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 		return err
 	}
 
-	var readBytes int64 = 0
-	var indexOffset int64 = 0
+	readBytes := int64(0)
+	indexOffset := int64(0)
 	readBuf := make([]byte, 1)
 	for indexOffset < offset {
 		_, err := fileFrom.ReadAt(readBuf, indexOffset)
@@ -67,7 +67,7 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 			return err
 		}
 
-		bar.Play(int64(readBytes))
+		bar.Play(readBytes)
 		_, err = fileTo.Write(readBuf)
 		if err != nil {
 			return err
