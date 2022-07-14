@@ -43,42 +43,37 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 		return err
 	}
 
-	readBytes := 0
-	arrayIndex := 0
-	var currOffset, indexOffset int64 = 0, 0
+	var readBytes int64 = 0
+	var indexOffset int64 = 0
 	readBuf := make([]byte, 1)
-	for currOffset < offset {
+	for indexOffset < offset {
 		_, err := fileFrom.ReadAt(readBuf, indexOffset)
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
 		}
-		//if readBuf[0] != 10 {
-		currOffset++
-		//}
+
 		indexOffset++
 	}
 
 	var bar Bar
 	bar.NewOption(0, countBytes)
-	for int64(arrayIndex) < countBytes {
-		read, err := fileFrom.ReadAt(readBuf, indexOffset+int64(readBytes))
+	for readBytes < countBytes {
+		read, err := fileFrom.ReadAt(readBuf, indexOffset+readBytes)
 		if errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
 			return err
 		}
-		//if readBuf[0] != 10 {
-		arrayIndex++
-		bar.Play(int64(arrayIndex))
-		//}
+
+		bar.Play(int64(readBytes))
 		_, err = fileTo.Write(readBuf)
 		if err != nil {
 			return err
 		}
 
-		readBytes += read
+		readBytes += int64(read)
 	}
 	bar.Finish()
 	fileTo.Close() // что бы очистить буферы ОС
