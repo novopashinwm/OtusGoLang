@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"time"
 )
 
 var (
@@ -72,7 +71,6 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 		}
 		if readBuf[0] != 10 {
 			arrayIndex++
-			time.Sleep(5 * time.Millisecond)
 			bar.Play(int64(arrayIndex))
 		}
 		_, err = fileTo.Write(readBuf)
