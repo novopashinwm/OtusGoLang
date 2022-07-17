@@ -40,7 +40,6 @@ func ReadDir(dir string) (Environment, error) {
 
 func ParseFile(file string) (EnvValue, error) {
 	f, err := os.Open(file)
-	defer f.Close()
 	if err != nil {
 		return EnvValue{Value: "", NeedRemove: false}, err
 	}
@@ -51,9 +50,11 @@ func ParseFile(file string) (EnvValue, error) {
 	if fileStat.Size() == 0 {
 		return EnvValue{Value: "", NeedRemove: true}, nil
 	}
+
 	reader := bufio.NewReader(f)
 	line, _ := reader.ReadBytes('\n')
 	line = bytes.ReplaceAll(line, []byte{0}, []byte{'\n'})
 	line = bytes.TrimRight(line, " \n\t\r")
+	f.Close()
 	return EnvValue{Value: string(line), NeedRemove: false}, nil
 }

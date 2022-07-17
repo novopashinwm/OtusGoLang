@@ -5,6 +5,11 @@ import (
 	"os/exec"
 )
 
+const (
+	successCode = 0
+	errorCode   = 1
+)
+
 // RunCmd runs a command + arguments (cmd) with environment variables from env.
 func RunCmd(cmd []string, env Environment) (returnCode int) {
 	for name, val := range env {
@@ -14,15 +19,15 @@ func RunCmd(cmd []string, env Environment) (returnCode int) {
 		}
 		os.Setenv(name, val.Value)
 	}
-	cmdItem := exec.Command(cmd[0], cmd[1:]...)
+
+	returnCode = successCode
+
+	cmdItem := exec.Command(cmd[0], cmd[1:]...) //nolint:gosec
 	cmdItem.Stdout = os.Stdout
 	cmdItem.Stdin = os.Stdin
 	cmdItem.Stderr = os.Stderr
 	if err := cmdItem.Run(); err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
-			returnCode = exitError.ExitCode()
-		}
+		returnCode = errorCode
 	}
 	return returnCode
-
 }
