@@ -10,37 +10,37 @@ type Bar struct {
 	graph   string // the fill value for progress bar
 }
 
-func (bar *Bar) NewOption(start, total int64) {
-	bar.cur = start
-	bar.total = total
-	if bar.graph == "" {
-		bar.graph = "█"
+func (progress *Bar) NewOption(start, total int64) {
+	progress.cur = start
+	progress.total = total
+	if progress.graph == "" {
+		progress.graph = "█"
 	}
-	bar.percent = bar.getPercent()
-	for i := 0; i < int(bar.percent); i += 2 {
-		bar.rate += bar.graph // initial progress position
+	progress.percent = progress.getPercent()
+	for i := 0; i < int(progress.percent); i += 2 {
+		progress.rate += progress.graph // initial progress position
 	}
 }
 
-func (bar *Bar) getPercent() int64 {
-	return int64(float32(bar.cur) / float32(bar.total) * 100)
+func (progress *Bar) getPercent() int64 {
+	return int64(float32(progress.cur) / float32(progress.total) * 100)
 }
 
-func (bar *Bar) NewOptionWithGraph(start, total int64, graph string) {
-	bar.graph = graph
-	bar.NewOption(start, total)
+func (progress *Bar) NewOptionWithGraph(start, total int64, graph string) {
+	progress.graph = graph
+	progress.NewOption(start, total)
 }
 
-func (bar *Bar) Play(cur int64) {
-	bar.cur = cur
-	last := bar.percent
-	bar.percent = bar.getPercent()
-	if bar.percent != last && bar.percent%2 == 0 {
-		bar.rate += bar.graph
+func (progress *Bar) Play(cur int64) {
+	progress.cur = cur
+	last := progress.percent
+	progress.percent = progress.getPercent()
+	if progress.percent != last && progress.percent%2 == 0 {
+		progress.rate += progress.graph
 	}
-	fmt.Printf("\r[%-50s]%3d%% %8d/%d", bar.rate, bar.percent, bar.cur, bar.total)
+	fmt.Printf("\r[%-50s]%3d%% %8d/%d", progress.rate, progress.percent, progress.cur, progress.total)
 }
 
-func (bar *Bar) Finish() {
+func (progress *Bar) Finish() {
 	fmt.Println()
 }

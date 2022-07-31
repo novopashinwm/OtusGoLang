@@ -18,6 +18,5 @@ func init() {
 
 func main() {
 	flag.Parse()
-	// Copy files
 	Copy(from, to, offset, limit)
 }
