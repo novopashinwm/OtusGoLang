@@ -13,6 +13,7 @@ func TestCopy(t *testing.T) {
 		require.Truef(t, errors.Is(err, ErrOffsetExceedsFileSize), "actual err - %v", err)
 	})
 
+	// Проверка полного копирования файла
 	t.Run("error - not supported file", func(t *testing.T) {
 		err := Copy("testdata", "out.txt", 0, 0)
 		require.Truef(t, errors.Is(err, ErrUnsupportedFile), "actual err - %v", err)

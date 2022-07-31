@@ -1,4 +1,4 @@
-module github.com/novopashinwm/hw07_file_copying
+module github.com/novopashinwmt/hw07_file_copying
 
 go 1.16
 
