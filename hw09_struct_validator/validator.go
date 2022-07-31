@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 )
 
 type ValidationError struct {
@@ -15,275 +14,261 @@ type ValidationError struct {
 	Err   error
 }
 
-var (
-	ErrUnsupportedType = errors.New("unsupported type")
-	ErrInvalidRule     = errors.New("invalid validation rule")
-
-	ErrNotInList      = errors.New("value must exist in list")
-	ErrExactLen       = errors.New("value must be exact length")
-	ErrLessOrEqual    = errors.New("value must be less or equal")
-	ErrGreaterOrEqual = errors.New("value must be greater or equal")
-	ErrMatchRegExp    = errors.New("value must match regular expression")
-)
-
-type (
-	intValidator struct {
-		min, max int64
-		in       []int64
-	}
-
-	stringValidator struct {
-		len int
-		in  []string
-		re  *regexp.Regexp
-	}
-)
-
 type ValidationErrors []ValidationError
 
+type intCheckFn func(int, int) bool
+
+type validationFn func(ruleVal string, val reflect.Value, name string) error
+
+var (
+	ErrNotStruct       = errors.New("input is not a struct")
+	ErrInvalidRule     = errors.New("invalid validation rule")
+	ErrUnsupportedType = errors.New("rule unavailable for this field type")
+
+	ErrExactLen    = errors.New("string len is not valid")
+	ErrNotInList   = errors.New("value is not in validated list")
+	ErrLessMin     = errors.New("value is less than minimal")
+	ErrGreaterMax  = errors.New("value is greater than maximal")
+	ErrMatchRegExp = errors.New("value does not match regular expression")
+)
+
 func (v ValidationErrors) Error() string {
-	var builder strings.Builder
-
-	for _, err := range v {
-		builder.WriteString(fmt.Sprintf("%s: %s\n", err.Field, err.Err.Error()))
+	var errStr string
+	for i := 0; i < len(v); i++ {
+		errStr += fmt.Sprintf("Field: %s, Error: %s", v[i].Field, v[i].Err) + "\n"
 	}
-
-	return builder.String()
+	return errStr
 }
 
 func Validate(v interface{}) error {
-	var validationErrs ValidationErrors
-
-	refValue := reflect.ValueOf(v)
-	if refValue.Kind() != reflect.Struct {
-		return ErrUnsupportedType
+	vVal := reflect.ValueOf(v)
+	if vVal.Kind() != reflect.Struct {
+		return ErrNotStruct
+	}
+	vType := reflect.TypeOf(v)
+	var errList ValidationErrors
+	for i := 0; i < vType.NumField(); i++ {
+		field := vType.Field(i)
+		rules := getValidationRules(field.Tag)
+		if len(rules) > 0 {
+			for ri := 0; ri < len(rules); ri++ {
+				err := validateField(rules[ri], vVal.Field(i), field.Name)
+				var valErr ValidationErrors
+				if err != nil {
+					if errors.As(err, &valErr) {
+						errList = append(errList, valErr...)
+					} else {
+						return err
+					}
+				}
+			}
+		}
 	}
 
-	filedCount := refValue.NumField()
-	for i := 0; i < filedCount; i++ {
-		fieldValue := refValue.Field(i)
-		if !fieldValue.CanInterface() {
-			continue
-		}
+	if len(errList) > 0 {
+		return errList
+	}
+	return nil
+}
 
-		fieldType := refValue.Type().Field(i)
-		tag := fieldType.Tag.Get("validate")
-		if tag == "" {
-			continue
+func getValidationRules(tag reflect.StructTag) (rules []string) {
+	validationTag, ok := tag.Lookup("validate")
+	if ok {
+		if validationTag != "" {
+			rules = strings.Split(validationTag, "|")
 		}
+	}
+	return
+}
 
-		switch fieldValue.Kind() { //nolint:exhaustive
-		case reflect.Int:
-			validator, err := parseIntFieldValidationRules(tag)
+func validateField(rules string, val reflect.Value, name string) error {
+	rulesData := strings.Split(rules, ":")
+	if len(rulesData) != 2 {
+		return fmt.Errorf("field %s: %w", name, ErrInvalidRule)
+	}
+	if rulesData[1] == "" {
+		return fmt.Errorf("field %s: %w", name, ErrInvalidRule)
+	}
+
+	switch rulesData[0] {
+	case "len":
+		return tryLenRule(rulesData[1], val, name)
+	case "regexp":
+		return tryRegexpRule(rulesData[1], val, name)
+	case "in":
+		return tryInRule(rulesData[1], val, name)
+	case "min":
+		return tryMinRule(rulesData[1], val, name)
+	case "max":
+		return tryMaxRule(rulesData[1], val, name)
+	}
+
+	return fmt.Errorf("field %s: %w", name, ErrInvalidRule)
+}
+
+func tryLenRule(ruleVal string, val reflect.Value, name string) error {
+	switch val.Type().Kind() { //nolint:exhaustive
+	case reflect.Slice:
+		return validateSlice(ruleVal, val, name, tryLenRule)
+	case reflect.String:
+		strLen, err := strconv.Atoi(ruleVal)
+		if err != nil {
+			return fmt.Errorf("field %s: %w caused by %s", name, ErrInvalidRule, err)
+		}
+		if val.Len() != strLen {
+			return ValidationErrors{ValidationError{
+				Field: name,
+				Err:   ErrExactLen,
+			}}
+		}
+	default:
+		return fmt.Errorf("field %s: %w", name, ErrUnsupportedType)
+	}
+
+	return nil
+}
+
+func tryInRule(ruleVal string, val reflect.Value, name string) error {
+	switch val.Type().Kind() { //nolint:exhaustive
+	case reflect.Slice:
+		return validateSlice(ruleVal, val, name, tryInRule)
+	case reflect.String:
+		availableVals := strings.Split(ruleVal, ",")
+		if !stringInSlice(val.String(), availableVals) {
+			return ValidationErrors{ValidationError{
+				Field: name,
+				Err:   ErrNotInList,
+			}}
+		}
+	case reflect.Int:
+		availableVals := strings.Split(ruleVal, ",")
+		availableInts := make([]int, len(availableVals))
+		for i := 0; i < len(availableVals); i++ {
+			value, err := strconv.Atoi(availableVals[i])
 			if err != nil {
+				return fmt.Errorf("field %s: %w caused by %s", name, ErrInvalidRule, err)
+			}
+			availableInts[i] = value
+		}
+
+		if !intInSlice(int(val.Int()), availableInts) {
+			return ValidationErrors{ValidationError{
+				Field: name,
+				Err:   ErrNotInList,
+			}}
+		}
+	default:
+		return fmt.Errorf("field %s: %w", name, ErrUnsupportedType)
+	}
+
+	return nil
+}
+
+func tryMinRule(ruleVal string, val reflect.Value, name string) error {
+	switch val.Type().Kind() { //nolint:exhaustive
+	case reflect.Slice:
+		return validateSlice(ruleVal, val, name, tryMinRule)
+	case reflect.Int:
+		return validateInt(ruleVal, int(val.Int()), name,
+			func(fVal int, checkVal int) bool {
+				return fVal < checkVal
+			},
+			ErrLessMin)
+	default:
+		return fmt.Errorf("field %s: %w", name, ErrUnsupportedType)
+	}
+}
+
+func tryMaxRule(ruleVal string, val reflect.Value, name string) error {
+	switch val.Type().Kind() { //nolint:exhaustive
+	case reflect.Slice:
+		return validateSlice(ruleVal, val, name, tryMaxRule)
+	case reflect.Int:
+		return validateInt(ruleVal, int(val.Int()), name,
+			func(fVal int, checkVal int) bool {
+				return fVal > checkVal
+			},
+			ErrGreaterMax)
+	default:
+		return fmt.Errorf("field %s: %w", name, ErrUnsupportedType)
+	}
+}
+
+func tryRegexpRule(ruleVal string, val reflect.Value, name string) error {
+	switch val.Type().Kind() { //nolint:exhaustive
+	case reflect.Slice:
+		return validateSlice(ruleVal, val, name, tryRegexpRule)
+	case reflect.String:
+		rEx, err := regexp.Compile(ruleVal)
+		if err != nil {
+			return fmt.Errorf("field %s: %w caused by %s", name, ErrInvalidRule, err)
+		}
+		if !rEx.Match([]byte(val.String())) {
+			return ValidationErrors{ValidationError{
+				Field: name,
+				Err:   ErrMatchRegExp,
+			}}
+		}
+	default:
+		return fmt.Errorf("field %s: %w", name, ErrUnsupportedType)
+	}
+
+	return nil
+}
+
+func validateSlice(ruleVal string, val reflect.Value, name string, validator validationFn) error {
+	var errs ValidationErrors
+	for i := 0; i < val.Len(); i++ {
+		err := validator(ruleVal, val.Index(i), name+"["+strconv.Itoa(i)+"]")
+		var valErr ValidationErrors
+		if err != nil {
+			if errors.As(err, &valErr) {
+				errs = append(errs, valErr...)
+			} else {
 				return err
 			}
-
-			if err := validator.validate(fieldValue.Int()); err != nil {
-				validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
-			}
-		case reflect.String:
-			validator, err := parseStringFieldValidationRules(tag)
-			if err != nil {
-				return err
-			}
-
-			if err := validator.validate(fieldValue.String()); err != nil {
-				validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
-			}
-		case reflect.Slice:
-			switch val := fieldValue.Interface().(type) {
-			case []int:
-				validator, err := parseIntFieldValidationRules(tag)
-				if err != nil {
-					return err
-				}
-
-				if err := validator.validateSlice(fieldType.Name, val); err != nil {
-					validationErrs = append(validationErrs, err...)
-				}
-			case []string:
-				validator, err := parseStringFieldValidationRules(tag)
-				if err != nil {
-					return err
-				}
-
-				if err := validator.validateSlice(fieldType.Name, val); err != nil {
-					validationErrs = append(validationErrs, err...)
-				}
-			}
 		}
 	}
-
-	if len(validationErrs) != 0 {
-		return validationErrs
+	if len(errs) > 0 {
+		return errs
 	}
 	return nil
 }
 
-func parseStringFieldValidationRules(tag string) (stringValidator, error) {
-	var validator stringValidator
-
-	rules := strings.Split(tag, "|")
-
-	for _, rule := range rules {
-		parts := strings.Split(rule, ":")
-		if len(parts) != 2 {
-			continue
-		}
-
-		switch parts[0] {
-		case "len":
-			v, err := strconv.Atoi(parts[1])
-			if err != nil {
-				return validator, fmt.Errorf("%w: len must be a valid integer", ErrInvalidRule)
-			}
-
-			validator.len = v
-		case "regexp":
-			re, err := regexp.Compile(parts[1])
-			if err != nil {
-				return validator, fmt.Errorf("%w: regexp must contain valid regular expression", ErrInvalidRule)
-			}
-
-			validator.re = re
-		case "in":
-			validator.in = strings.Split(parts[1], ",")
-		}
+func validateInt(
+	ruleValue string,
+	fieldValue int,
+	fieldName string,
+	check intCheckFn,
+	possibleErr error,
+) error {
+	checkVal, err := strconv.Atoi(ruleValue)
+	if err != nil {
+		return fmt.Errorf("field %s: %w caused by %s", fieldName, ErrInvalidRule, err)
 	}
-
-	return validator, nil
-}
-
-func parseIntFieldValidationRules(tag string) (intValidator, error) {
-	var validator intValidator
-
-	rules := strings.Split(tag, "|")
-
-	for _, rule := range rules {
-		parts := strings.Split(rule, ":")
-		if len(parts) != 2 {
-			continue
-		}
-
-		switch parts[0] {
-		case "min":
-			v, err := strconv.ParseInt(parts[1], 10, 64)
-			if err != nil {
-				return validator, fmt.Errorf("%w: min must be a valid integer", ErrInvalidRule)
-			}
-
-			validator.min = v
-		case "max":
-			v, err := strconv.ParseInt(parts[1], 10, 64)
-			if err != nil {
-				return validator, fmt.Errorf("%w: max must be a valid integer", ErrInvalidRule)
-			}
-
-			validator.max = v
-		case "in":
-			numbers := strings.Split(parts[1], ",")
-			validator.in = make([]int64, 0, len(numbers))
-
-			for _, n := range numbers {
-				v, err := strconv.ParseInt(n, 10, 64)
-				if err != nil {
-					return validator, fmt.Errorf("%w: in must contain valid intergers", ErrInvalidRule)
-				}
-				validator.in = append(validator.in, v)
-			}
-		}
+	if check(fieldValue, checkVal) {
+		return ValidationErrors{ValidationError{
+			Field: fieldName,
+			Err:   possibleErr,
+		}}
 	}
-
-	return validator, nil
-}
-
-func (v stringValidator) validateSlice(fieldName string, items []string) ValidationErrors {
-	if len(items) == 0 {
-		return nil
-	}
-
-	var errs ValidationErrors
-
-	for i := range items {
-		if err := v.validate(items[i]); err != nil {
-			errs = append(errs, ValidationError{
-				Err:   err,
-				Field: fmt.Sprintf("%s.%d", fieldName, i),
-			})
-		}
-	}
-
-	return errs
-}
-
-func (v intValidator) validateSlice(fieldName string, items []int) ValidationErrors {
-	if len(items) == 0 {
-		return nil
-	}
-
-	var errs ValidationErrors
-
-	for i := range items {
-		if err := v.validate(int64(items[i])); err != nil {
-			errs = append(errs, ValidationError{
-				Err:   err,
-				Field: fmt.Sprintf("%s.%d", fieldName, i),
-			})
-		}
-	}
-
-	return errs
-}
-
-func (v stringValidator) validate(item string) error {
-	if v.len != 0 && utf8.RuneCountInString(item) != v.len {
-		return fmt.Errorf("%w %d", ErrExactLen, v.len)
-	}
-
-	if v.re != nil && v.re.FindString(item) != item {
-		return fmt.Errorf("%w %s", ErrMatchRegExp, v.re.String())
-	}
-
-	if len(v.in) > 0 {
-		var found bool
-		for i := range v.in {
-			if v.in[i] == item {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return fmt.Errorf("%w %q", ErrNotInList, v.in)
-		}
-	}
-
 	return nil
 }
 
-func (v intValidator) validate(item int64) error {
-	if v.min != 0 && item < v.min {
-		return fmt.Errorf("%w %d", ErrGreaterOrEqual, v.min)
-	}
-
-	if v.max != 0 && item > v.max {
-		return fmt.Errorf("%w %d", ErrLessOrEqual, v.max)
-	}
-
-	if len(v.in) > 0 {
-		var found bool
-		for i := range v.in {
-			if v.in[i] == item {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return fmt.Errorf("%w %q", ErrNotInList, v.in)
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
 		}
 	}
+	return false
+}
 
-	return nil
+func intInSlice(a int, list []int) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }

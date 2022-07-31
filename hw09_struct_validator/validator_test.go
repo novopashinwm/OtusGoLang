@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type UserRole string
@@ -36,22 +37,6 @@ type (
 		Code int    `validate:"in:200,404,500"`
 		Body string `json:"omitempty"`
 	}
-
-	InvalidRuleLen struct {
-		ID string `validate:"len:short"`
-	}
-	InvalidRuleMin struct {
-		Age int `validate:"min:youngster"`
-	}
-	InvalidRuleMax struct {
-		Age int `validate:"max:adult"`
-	}
-	InvalidRuleInteger struct {
-		Code int `validate:"in:one,two"`
-	}
-	InvalidRuleRegExp struct {
-		Email string `validate:"regexp:(@"`
-	}
 )
 
 func TestValidate(t *testing.T) {
@@ -63,12 +48,12 @@ func TestValidate(t *testing.T) {
 		{
 			name:        "01 - some string - Error",
 			in:          "not a struct",
-			expectedErr: ErrUnsupportedType,
+			expectedErr: ErrNotStruct,
 		},
 		{
 			name:        "02 - some number - Error",
 			in:          1234,
-			expectedErr: ErrUnsupportedType,
+			expectedErr: ErrNotStruct,
 		},
 		{
 			name: "03 - User valid",
@@ -96,11 +81,11 @@ func TestValidate(t *testing.T) {
 			},
 			expectedErr: ValidationErrors{
 				{Field: "ID", Err: ErrExactLen},
-				{Field: "Age", Err: ErrLessOrEqual},
+				{Field: "Age", Err: ErrGreaterMax},
 				{Field: "Email", Err: ErrMatchRegExp},
 				{Field: "Role", Err: ErrNotInList},
-				{Field: "Phones.0", Err: ErrExactLen},
-				{Field: "Phones.1", Err: ErrExactLen},
+				{Field: "Phones[0]", Err: ErrExactLen},
+				{Field: "Phones[1]", Err: ErrExactLen},
 			},
 		},
 		{
@@ -115,8 +100,8 @@ func TestValidate(t *testing.T) {
 				meta:   nil,
 			},
 			expectedErr: ValidationErrors{
-				{Field: "Age", Err: ErrGreaterOrEqual},
-				{Field: "Phones.1", Err: ErrExactLen},
+				{Field: "Age", Err: ErrLessMin},
+				{Field: "Phones[1]", Err: ErrExactLen},
 			},
 		},
 		{
@@ -157,31 +142,6 @@ func TestValidate(t *testing.T) {
 			expectedErr: ValidationErrors{
 				{Field: "Code", Err: ErrNotInList},
 			},
-		},
-		{
-			name:        "11 - validate rule len",
-			in:          InvalidRuleLen{ID: "ID123456"},
-			expectedErr: ErrInvalidRule,
-		},
-		{
-			name:        "12 - validate rule min",
-			in:          InvalidRuleMin{Age: 12},
-			expectedErr: ErrInvalidRule,
-		},
-		{
-			name:        "13 - validate rule max",
-			in:          InvalidRuleMax{Age: 50},
-			expectedErr: ErrInvalidRule,
-		},
-		{
-			name:        "14 - validate rule integer",
-			in:          InvalidRuleInteger{Code: 200},
-			expectedErr: ErrInvalidRule,
-		},
-		{
-			name:        "15 - validate rule RegExp",
-			in:          InvalidRuleRegExp{Email: "test@mail.test"},
-			expectedErr: ErrInvalidRule,
 		},
 	}
 
