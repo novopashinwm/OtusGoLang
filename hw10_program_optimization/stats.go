@@ -28,6 +28,7 @@ func GetDomainStat(r io.Reader, domain string) (DomainStat, error) {
 	userC, errC := getUsers(r, domain)
 	return countDomains(userC, errC, domain)
 }
+
 func getUsers(r io.Reader, domain string) (<-chan User, <-chan error) {
 	linesC := readLine(r, domain)
 	usersChan := make(chan User, 10)
