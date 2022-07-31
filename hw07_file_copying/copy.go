@@ -35,10 +35,10 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 		return ErrOffsetExceedsFileSize
 	}
 
-	countBytesToWrite := minInt64(fileSize-offset, limit)
+	countBytes := minInt64(fileSize-offset, limit)
 	fileTo, _ := os.Create(toPath)
-	if countBytesToWrite == fileSize {
-		_, err := io.CopyN(fileTo, fileFrom, countBytesToWrite)
+	if countBytes == fileSize {
+		_, err := io.CopyN(fileTo, fileFrom, countBytes)
 		fileTo.Close()
 		return err
 	}
@@ -57,8 +57,8 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 	}
 
 	var bar Bar
-	bar.NewOption(0, countBytesToWrite)
-	for readBytes < countBytesToWrite {
+	bar.NewOption(0, countBytes)
+	for readBytes < countBytes {
 		read, err := fileFrom.ReadAt(readBuf, indexOffset+readBytes)
 		if errors.Is(err, io.EOF) {
 			break

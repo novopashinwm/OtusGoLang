@@ -14,11 +14,6 @@ func TestCopy(t *testing.T) {
 	})
 
 	t.Run("error - not supported file", func(t *testing.T) {
-		err := Copy("testdata", "out.txt", 0, 10)
-		require.Truef(t, errors.Is(err, ErrUnsupportedFile), "actual err - %v", err)
-	})
-
-	t.Run("error - not supported file", func(t *testing.T) {
 		err := Copy("testdata", "out.txt", 0, 0)
 		require.Truef(t, errors.Is(err, ErrUnsupportedFile), "actual err - %v", err)
 	})
