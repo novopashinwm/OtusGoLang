@@ -37,22 +37,7 @@ func TestCopy(t *testing.T) {
 			fileCheck:   "",
 			expectedErr: ErrUnsupportedFile,
 		},
-		{
-			name:        "offset 0 limit 0",
-			offset:      0,
-			limit:       0,
-			fileIn:      "testdata/input.txt",
-			fileCheck:   "out_offset0_limit0.txt",
-			expectedErr: nil,
-		},
-		{
-			name:        "offset 0 limit 10",
-			offset:      0,
-			limit:       10,
-			fileIn:      "testdata/input.txt",
-			fileCheck:   "out_offset0_limit10.txt",
-			expectedErr: nil,
-		},
+
 		{
 			name:        "offset 0 limit 1000",
 			offset:      0,
@@ -67,24 +52,6 @@ func TestCopy(t *testing.T) {
 			limit:       10000,
 			fileIn:      "testdata/input.txt",
 			fileCheck:   "out_offset0_limit10000.txt",
-			expectedErr: nil,
-		},
-
-		{
-			name:        "offset 100 limit 1000",
-			offset:      100,
-			limit:       1000,
-			fileIn:      "testdata/input.txt",
-			fileCheck:   "out_offset100_limit1000.txt",
-			expectedErr: nil,
-		},
-
-		{
-			name:        "offset 6000 limit 1000",
-			offset:      6000,
-			limit:       1000,
-			fileIn:      "testdata/input.txt",
-			fileCheck:   "out_offset6000_limit1000.txt",
 			expectedErr: nil,
 		},
 	}
