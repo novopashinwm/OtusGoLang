@@ -53,7 +53,6 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 		} else if err != nil {
 			return err
 		}
-
 		indexOffset++
 	}
 
