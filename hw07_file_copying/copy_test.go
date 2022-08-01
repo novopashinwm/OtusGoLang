@@ -97,7 +97,7 @@ func TestCopy(t *testing.T) {
 			if err != nil {
 				require.Truef(t, errors.Is(err, test.expectedErr), "actual err - %v", err)
 			} else {
-				check := deepCompare(test.fileCheck, "out.txt")
+				check := deepCompare("testdata/"+test.fileCheck, "out.txt")
 				require.Truef(t, check, "actual err - %v", err)
 			}
 		})
